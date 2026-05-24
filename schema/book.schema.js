@@ -3,44 +3,55 @@ const { Schema, model } = require("mongoose");
 const Book = new Schema({
   title: {
     type: String,
-    required: true
+    required: true,
+    set: (val) => val.trim(),
+    minLength: [3, "Kamida 3 ta harf bolsin"],
+    maxLength: 150,
   },
-  author: {
-    type: Schema.Types.ObjectId,
-    ref: "Author",
-    required: true
-  },
-  cover_image: {
-    type: String,
-    required: true
-  },
-  rating: {
-    type: Number,
-    default: 0,
-    min: 0,
-    max: 5
-  },
-  reviews_count: {
-    type: Number,
-    default: 0
-  },
-  genre: {
+  period: {
     type: String,
     required: true,
     enum: {
-      values: ["Badiy", "Tarixiy", "Fantastik", "Nasr", "Drama", "Qissa", "Roman", "She'riat"],
-      default: "Badiy",
+      values: ["Temuriylar davri", "Jadid davri", "Sovet davri", "Mustaqillik davri"],
+      message: "{VALUE} bunday qiymat ko'rsatilmagan"
+    },
+    default: "Temuriylar davri"
+  },
+  pages: {
+    type: Number,
+    required: true,
+    min: 0,
+    max: 10000
+  },
+  published_year: {
+    type: Number,
+    required: true
+  },
+  genres: {
+    type: String,
+    required: true,
+    enum: {
+      values: ["Fantastik", "Badiy", "Drama", "meladrama", "tarixiy", "diniy", "romantik", "roman"],
       message: "{VALUE} bunday qiymat ko'rsatilmagan"
     }
   },
-  description: {
+  publisher: {
     type: String,
     required: true
+  },
+  details: {
+    type: String,
+    required: true
+  },
+  author_info: {
+    type: Schema.Types.ObjectId,
+    required: true,
+    ref: "Author"
   }
 }, {
   versionKey: false,
   timestamps: true
-});
+})
 
-const BookSchema = model("Book", Book);
-module.exports = BookSchema;
+const BookSchema = model("Book", Book)
+module.exports = BookSchema
