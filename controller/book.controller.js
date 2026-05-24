@@ -14,7 +14,7 @@ const getAllBooks = async (req, res) => {
 
 const addBook = async (req, res) => {
   try {
-    const { title, author, cover_image, rating, reviews_count, period, description } =
+    const { title, author, cover_image, rating, reviews_count, genre, description } =
       req.body;
 
     await BookSchema.create({
@@ -23,7 +23,7 @@ const addBook = async (req, res) => {
       cover_image,
       rating,
       reviews_count,
-      period,
+      genre,
       description,
     });
 
@@ -60,7 +60,7 @@ const getOneBook = async (req, res) => {
 const updateBook = async (req, res) => {
   try {
     const { id } = req.params;
-    const { title, author, cover_image, rating, reviews_count, period, description } =
+    const { title, author, cover_image, rating, reviews_count, genre, description } =
       req.body;
 
     const foundedBook = await BookSchema.findById(id);
@@ -77,7 +77,7 @@ const updateBook = async (req, res) => {
       cover_image,
       rating,
       reviews_count,
-      period,
+      genre,
       description,
     });
 

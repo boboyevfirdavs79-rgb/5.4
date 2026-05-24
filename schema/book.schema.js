@@ -24,12 +24,12 @@ const Book = new Schema({
     type: Number,
     default: 0
   },
-  period: {
+  genre: {
     type: String,
     required: true,
     enum: {
-      values: ["Temuriylar davri", "Jadid adabiyoti", "Sovet davri", "Mustaqillik davri"],
-      default: "Temuriylar davri",
+      values: ["Badiy", "Tarixiy", "Fantastik", "Nasr", "Drama", "Qissa", "Roman", "She'riat"],
+      default: "Badiy",
       message: "{VALUE} bunday qiymat ko'rsatilmagan"
     }
   },
