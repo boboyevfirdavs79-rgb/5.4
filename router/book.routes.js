@@ -1,13 +1,30 @@
-const { Router } = require("express")
-const { getAllBooks, getOneBook, search, addBook, updateBook, deleteBook } = require("../controller/book.controller")
+const { Router } = require("express");
+const {
+  getAllBooks,
+  getOneBook,
+  search,
+  addBook,
+  updateBook,
+  deleteBook,
+} = require("../controller/book.controller");
+const authMiddleware = require("../middleware/auth.middleware");
+const upload = require("../middleware/upload.middleware");
 
-const bookRouter = Router()
+const bookRouter = Router();
 
-bookRouter.get("/get_all_books", getAllBooks)
-bookRouter.get("/get_one_book/:id", getOneBook)
-bookRouter.get("/search", search)
-bookRouter.post("/add_book", addBook)
-bookRouter.put("/update_book/:id", updateBook)
-bookRouter.delete("/delete_book/:id", deleteBook)
+// tokensiz kirish
+bookRouter.get("/get_all_books", getAllBooks);
+bookRouter.get("/get_one_book/:id", getOneBook);
+bookRouter.get("/search", search);
 
-module.exports = bookRouter
+// token bn kirish
+bookRouter.post("/add_book", authMiddleware, upload.single("cover"), addBook);
+bookRouter.put(
+  "/update_book/:id",
+  authMiddleware,
+  upload.single("cover"),
+  updateBook,
+);
+bookRouter.delete("/delete_book/:id", authMiddleware, deleteBook);
+
+module.exports = bookRouter;
