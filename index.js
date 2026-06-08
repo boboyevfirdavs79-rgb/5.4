@@ -16,11 +16,12 @@ connectDB()
 
 
 // Router
-app.use(authRouter)
-app.use(authorRouter)
-app.use(bookRouter)
-app.use(errorMiddleware)
+app.use(authorRouter);
+app.use(bookRouter);
+app.use(authRouter);
+app.use(quoteRouter);
 
+app.use(errorMiddleware);
 
 app.listen(PORT, () => {
   console.log("Server is running at: " + PORT);

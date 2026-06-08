@@ -1,15 +1,22 @@
-const authValidator = require("../validator/auth.validator");
+const CustomErrorHandler = require("../error/error")
+const authValidator = require("../validator/auth.validator")
 
 module.exports = function (type) {
+
   return function (req, res, next) {
-    const { error } = authValidator(req.body, type);
+
+    const validatorAction = authValidator[type];
+
+    if (!validatorAction) {
+      return next(new Error(`Validator ichida '${type}' degan funksiya topilmadi.`));
+    }
+
+    const { error } = validatorAction(req.body);
 
     if (error) {
-      return res.status(400).json({
-        success: false,
-        message: error.details ? error.details[0].message : error.message,
-      });
+      throw CustomErrorHandler.BadRequest(error);
     }
+
     next();
   };
 };

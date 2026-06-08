@@ -1,20 +1,11 @@
-const joi = require("joi");
+const joi = require("joi")
 
-module.exports = function (data, type) {
-  let schema;
+module.exports = function (data) {
+  const schema = joi.object({
+    username: joi.string().required(),
+    email: joi.string().email().required(),
+    password: joi.string().required()
+  })
 
-  if (type === "register") {
-    schema = joi.object({
-      username: joi.string().min(3).max(30).required(),
-      email: joi.string().email().required(),
-      password: joi.string().min(6).required(),
-    });
-  } else if (type === "login") {
-    schema = joi.object({
-      email: joi.string().email().required(),
-      password: joi.string().required(),
-    });
-  }
-
-  return schema.validate(data);
-};
+  return schema.validate(data)
+}

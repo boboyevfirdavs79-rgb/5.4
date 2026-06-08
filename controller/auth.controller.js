@@ -1,139 +1,130 @@
-const bcrypt = require("bcryptjs");
-const jwt = require("jsonwebtoken");
-const UserSchema = require("../schema/user.schema");
 const CustomErrorHandler = require("../error/error");
-const sendEmail = require("../utils/sendEmail");
+const AuthSchema = require("../schema/auth.schema");
+const bcrypt = require("bcryptjs");
+const sendEmail = require("../utils/email-sender");
+const jwt = require("jsonwebtoken");
 
-const randomcode = Array.from({ length: 6 }, () =>
-  Math.floor(Math.random() * 9),
-).join("");
-
-const register = async (req, res, next) => {
+const register = async (req, res) => {
   try {
     const { username, email, password } = req.body;
 
-    const existingUser = await UserSchema.findOne({
-      $or: [{ email }, { username }],
-    });
+    const foundedUser = await AuthSchema.findOne({ email });
 
-    if (existingUser) {
-      if (existingUser.email === email) {
-        return next(
-          CustomErrorHandler.BadRequest(
-            "Bu email allaqachon ro'yxatdan o'tgan",
-          ),
-        );
-      }
-      return next(CustomErrorHandler.BadRequest("Bu username band"));
+    if (foundedUser) {
+      throw CustomErrorHandler.UnAuthorized("User already exists");
     }
 
-    const hashedPassword = await bcrypt.hash(password, 12);
+    const randomCode = Array.from({ length: 6 }, () =>
+      Math.floor(Math.random() * 9),
+    ).join("");
 
-    const verifyCode = randomcode;
-    const verifyCodeExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 daqiqa
+    const dateNow = Date.now() + 120000;
 
-    // akkaunt yaratish
-    await UserSchema.create({
+    const hashPassword = await bcrypt.hash(password, 12);
+
+    await sendEmail(email, randomCode);
+
+    await AuthSchema.create({
       username,
       email,
-      password: hashedPassword,
-      verifyCode,
-      verifyCodeExpires,
+      password: hashPassword,
+      otp: randomCode,
+      otpTime: dateNow,
     });
-
-    // Emailga kod yuborish
-    await sendEmail(email, verifyCode);
 
     res.status(201).json({
-      message: `${email} manziliga tasdiqlash kodi yuborildi`,
+      message: "Registered",
     });
   } catch (error) {
-    next(error);
+    res.status(500).json({
+      message: error.message || "User already exists",
+    });
   }
 };
 
-const verify = async (req, res, next) => {
+const verify = async (req, res) => {
   try {
     const { email, code } = req.body;
 
-    const user = await UserSchema.findOne({ email });
+    const foundedUser = await AuthSchema.findOne({ email });
 
-    if (!user) {
-      return next(CustomErrorHandler.NotFound("Foydalanuvchi topilmadi"));
+    if (!foundedUser) {
+      throw CustomErrorHandler.UnAuthorized("User not found");
     }
 
-    if (user.isVerified) {
-      return next(
-        CustomErrorHandler.BadRequest("Hisob allaqachon tasdiqlangan"),
-      );
+    if (foundedUser.otpTime < Date.now()) {
+      throw CustomErrorHandler.UnAuthorized("code expired");
     }
 
-    if (user.verifyCode !== code) {
-      return next(CustomErrorHandler.BadRequest("Tasdiqlash kodi noto'g'ri"));
+    if (foundedUser.otp !== code) {
+      throw CustomErrorHandler.UnAuthorized("wrong code");
     }
 
-    if (user.verifyCodeExpires < new Date()) {
-      return next(
-        CustomErrorHandler.BadRequest("Tasdiqlash kodining muddati tugagan"),
-      );
-    }
+    const payload = {
+      id: foundedUser._id,
+      email: foundedUser.email,
+      role: foundedUser.role,
+    };
 
-    // Hisobni tasdiqlash
-    await UserSchema.updateOne(
-      { email },
-      {
-        isVerified: true,
-        verifyCode: null,
-        verifyCodeExpires: null,
-      },
-    );
+    const token = jwt.sign(payload, process.env.SECRET_KEY, {
+      expiresIn: "15d",
+    });
 
-    res.status(200).json({ message: "Hisob muvaffaqiyatli tasdiqlandi" });
+    await AuthSchema.findByIdAndUpdate(foundedUser._id, {
+      otp: "",
+      otpTime: 0,
+    });
+
+    res.status(200).json({
+      message: "Succes",
+      token,
+    });
   } catch (error) {
-    next(error);
+    res.status(500).json({
+      message: error.message,
+    });
   }
 };
 
-const login = async (req, res, next) => {
+const login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    const user = await UserSchema.findOne({ email });
+    const foundedUser = await AuthSchema.findOne({ email });
 
-    if (!user) {
-      return next(CustomErrorHandler.BadRequest("Email yoki parol noto'g'ri"));
+    if (!foundedUser) {
+      throw CustomErrorHandler.UnAuthorized("User not found");
     }
 
-    if (!user.isVerified) {
-      return next(
-        CustomErrorHandler.Forbidden("Avval emailingizni tasdiqlang"),
-      );
+    const decode = await bcrypt.compare(password, foundedUser.password);
+
+    if (decode) {
+      const randomCode = Array.from({ length: 6 }, () =>
+        Math.floor(Math.random() * 9),
+      ).join("");
+
+      const dateNow = Date.now() + 120000;
+
+      await sendEmail(email, randomCode);
+
+      await AuthSchema.findByIdAndUpdate(foundedUser._id, { otp: randomCode, otpTime: dateNow })
+
+      res.status(200).json({
+        message: "Please check your email"
+      })
+
+    } else {
+      throw CustomErrorHandler.UnAuthorized("Wrong password");
     }
-
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
-      return next(CustomErrorHandler.BadRequest("Email yoki parol noto'g'ri"));
-    }
-
-    const token = jwt.sign(
-      { id: user._id, role: user.role, username: user.username },
-      process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRES_IN || "7d" },
-    );
-
-    res.status(200).json({
-      message: "Muvaffaqiyatli kirildi",
-      token,
-      user: {
-        id: user._id,
-        username: user.username,
-        email: user.email,
-        role: user.role,
-      },
-    });
   } catch (error) {
-    next(error);
+    res.status(500).json({
+      message: error.message,
+    });
   }
 };
 
-module.exports = { register, verify, login };
+module.exports = {
+  register,
+  verify,
+  login,
+};

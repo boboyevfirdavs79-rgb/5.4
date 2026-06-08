@@ -1,16 +1,11 @@
 const { Router } = require("express");
-const { register, verify, login } = require("../controller/auth.controller");
-const {
-  registerValidator,
-  loginValidator,
-  verifyValidator,
-  validate,
-} = require("../validator/auth.validator");
+const { register, login, verify } = require("../controller/auth.controller");
+const authValidateMiddleware = require("../middleware/auth.validate.middleware");
 
 const authRouter = Router();
 
-authRouter.post("/auth/register", registerValidator, validate, register);
-authRouter.post("/auth/verify", verifyValidator, validate, verify);
-authRouter.post("/auth/login", loginValidator, validate, login);
+authRouter.post("/register", authValidateMiddleware("register"), register);
+authRouter.post("/verify", authValidateMiddleware("verify"), verify)
+authRouter.post("/login", authValidateMiddleware("login"), login);
 
 module.exports = authRouter;

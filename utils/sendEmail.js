@@ -6,21 +6,22 @@ async function sendEmail(email, code) {
     const transporter = nodemailer.createTransport({
       service: "gmail",
       auth: {
-        user: "boboyevfirdavs79@gmail.com",
-        pass: process.env.GOOGLE_PASS,
+        user: "nodirbekrustamov771@gmail.com",
+        pass: process.env.GOOGLE_PASS
       },
     });
 
     await transporter.sendMail({
-      subject: "DevBook",
-      text: "lorem ipsum",
-      from: "boboyevfirdavs79@gmail.com",
+      subject: "devbook",
+      text: "Lorem ipsum",
+      from: "nodirbekrustamov771@gmail.com",
       to: email,
-      html: `<b style="color: blue; font-size : 36px ">${code}</b>`,
-    });
-  } catch (err) {
-    throw CustomErrorHandler.BadRequest("error.message");
+      html: `<b style="color: blue; font-size: 36px;">${code}</b>`
+    })
+
+  } catch (error) {
+    throw CustomErrorHandler.BadRequest(error.message);
   }
 }
 
-module.exports = sendEmail;
+module.exports = sendEmail
