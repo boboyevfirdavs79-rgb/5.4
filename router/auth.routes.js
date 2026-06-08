@@ -1,11 +1,19 @@
 const { Router } = require("express");
-const { register, login, verify } = require("../controller/auth.controller");
-const authValidateMiddleware = require("../middleware/auth.validate.middleware");
+const { register, verify, login, logout } = require("../controller/auth.controller");
+const {
+  registerValidator,
+  loginValidator,
+  verifyValidator,
+  validate,
+} = require("../validator/auth.validator");
+const refreshToken = require("../middleware/refresh-token");
 
 const authRouter = Router();
 
-authRouter.post("/register", authValidateMiddleware("register"), register);
-authRouter.post("/verify", authValidateMiddleware("verify"), verify)
-authRouter.post("/login", authValidateMiddleware("login"), login);
+authRouter.post("/auth/register", registerValidator, validate, register);
+authRouter.post("/auth/verify", verifyValidator, validate, verify);
+authRouter.post("/auth/login", loginValidator, validate, login);
+authRouter.get("/refresh", refreshToken)
+authRouter.options("/logout", logout)
 
 module.exports = authRouter;

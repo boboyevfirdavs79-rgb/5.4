@@ -5,23 +5,19 @@ const Quote = new Schema(
     text: {
       type: String,
       required: true,
-      trim: true,
-      minLength: [5, "Iqtibos kamida 5 ta belgidan iborat bo'lsin"],
-      maxLength: [500, "Iqtibos 500 ta belgidan oshmasin"],
+      set: (val) => val.trim(),
+      minLength: [5, "Iqtibos kamida 5 ta harf bolsin"],
+      maxLength: [1000, "Iqtibos 1000 ta harfdan oshmasin"],
     },
-    page: {
-      type: Number,
-      default: null,
+    author_name: {
+      type: String,
+      required: true,
+      set: (val) => val.trim(),
     },
     book_id: {
       type: Schema.Types.ObjectId,
+      required: true,
       ref: "Book",
-      required: true,
-    },
-    added_by: {
-      type: Schema.Types.ObjectId,
-      ref: "User",
-      required: true,
     },
   },
   {
@@ -30,4 +26,5 @@ const Quote = new Schema(
   }
 );
 
-module.exports = model("Quote", Quote);
+const QuoteSchema = model("Quote", Quote);
+module.exports = QuoteSchema;

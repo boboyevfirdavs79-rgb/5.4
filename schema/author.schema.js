@@ -1,42 +1,51 @@
 const { Schema, model } = require("mongoose");
 
-const User = new Schema({
-  username: {
+const AuthorSchema = new Schema({
+  full_name: {
     type: String,
-    required: [true, "Username shart"],
-    unique: true,
-    trim: true,
-    minLength: [3, "Kamida 3 ta belgi"],
-    maxLength: 30,
+    required: [true, "Muallif ismini kiritish majburiy!"],
+    trim: true
   },
-  email: {
+  birth_year: {
+    type: Number,
+    required: [true, "Tug'ilgan yilini kiritish majburiy!"],
+    min: [0, "Yil manfiy bo'lishi mumkin emas"]
+  },
+  death_year: {
+    type: Number,
+    required: false,
+    validate: {
+      validator: function (value) {
+
+        return !value || value >= this.birth_year;
+      },
+      message: "O'lim yili tug'ilgan yildan oldin bo'lishi mumkin emas!"
+    }
+  },
+  bio: {
     type: String,
-    required: true,
-    unique: true,
-    trim: true,
-    lowercase: true,
+    required: [true, "Biografiyani kiritish majburiy!"]
   },
-  password: {
+  period: {
     type: String,
-    required: true,
+    required: [true, "Davriylikni kiritish majburiy!"],
+    default: "Temuriylar davri",
+    enum: {
+      values: ["Temuriylar davri", "Jadid davri", "Sovet davri", "Mustaqillik davri"],
+      message: "{VALUE} bunday davr ko'rsatilmagan"
+    }
   },
-  otp: {
+  work: {
     type: String,
-    required: true,
+    required: [true, "Asarlarini kiritish majburiy!"]
   },
-  otpTime: {
-    type: BigInt,
-    required: true,
-  },
-  role: {
+  region: {
     type: String,
-    enum: ["admin", "user", "superadmin"],
-    default: "user",
-  },
+    required: [true, "Tug'ilgan hududini kiritish majburiy!"]
+  }
 }, {
   versionKey: false,
-  timestamps: true,
+  timestamps: true
 });
 
-const AuthSchema = model("User", User);
-module.exports = AuthSchema;
+module.exports = model("Author", AuthorSchema);

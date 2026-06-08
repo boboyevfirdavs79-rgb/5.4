@@ -1,130 +1,159 @@
-const CustomErrorHandler = require("../error/error");
-const AuthSchema = require("../schema/auth.schema");
 const bcrypt = require("bcryptjs");
-const sendEmail = require("../utils/email-sender");
-const jwt = require("jsonwebtoken");
+const UserSchema = require("../schema/user.schema");
+const CustomErrorHandler = require("../error/error");
+const sendEmail = require("../utils/sendEmail");
 
-const register = async (req, res) => {
+const randomcode = Array.from({ length: 6 }, () =>
+  Math.floor(Math.random() * 9),
+).join("");
+
+const register = async (req, res, next) => {
   try {
     const { username, email, password } = req.body;
 
-    const foundedUser = await AuthSchema.findOne({ email });
+    const existingUser = await UserSchema.findOne({
+      $or: [{ email }, { username }],
+    });
 
-    if (foundedUser) {
-      throw CustomErrorHandler.UnAuthorized("User already exists");
+    if (existingUser) {
+      if (existingUser.email === email) {
+        return next(
+          CustomErrorHandler.BadRequest(
+            "Bu email allaqachon ro'yxatdan o'tgan",
+          ),
+        );
+      }
+      return next(CustomErrorHandler.BadRequest("Bu username band"));
     }
 
-    const randomCode = Array.from({ length: 6 }, () =>
-      Math.floor(Math.random() * 9),
-    ).join("");
+    const hashedPassword = await bcrypt.hash(password, 12);
 
-    const dateNow = Date.now() + 120000;
+    const verifyCode = randomcode;
+    const verifyCodeExpires = new Date(Date.now() + 10 * 60 * 1000);
 
-    const hashPassword = await bcrypt.hash(password, 12);
-
-    await sendEmail(email, randomCode);
-
-    await AuthSchema.create({
+    await UserSchema.create({
       username,
       email,
-      password: hashPassword,
-      otp: randomCode,
-      otpTime: dateNow,
+      password: hashedPassword,
+      verifyCode,
+      verifyCodeExpires,
     });
 
+    await sendEmail(email, verifyCode);
+
     res.status(201).json({
-      message: "Registered",
+      message: `${email} manziliga tasdiqlash kodi yuborildi`,
     });
   } catch (error) {
-    res.status(500).json({
-      message: error.message || "User already exists",
-    });
+    next(error);
   }
 };
 
-const verify = async (req, res) => {
+const verify = async (req, res, next) => {
   try {
     const { email, code } = req.body;
 
-    const foundedUser = await AuthSchema.findOne({ email });
+    const user = await UserSchema.findOne({ email });
 
-    if (!foundedUser) {
-      throw CustomErrorHandler.UnAuthorized("User not found");
+    if (!user) {
+      return next(CustomErrorHandler.NotFound("Foydalanuvchi topilmadi"));
     }
 
-    if (foundedUser.otpTime < Date.now()) {
-      throw CustomErrorHandler.UnAuthorized("code expired");
+    if (user.isVerified) {
+      return next(
+        CustomErrorHandler.BadRequest("Hisob allaqachon tasdiqlangan"),
+      );
     }
 
-    if (foundedUser.otp !== code) {
-      throw CustomErrorHandler.UnAuthorized("wrong code");
+    if (user.verifyCode !== code) {
+      return next(CustomErrorHandler.BadRequest("Tasdiqlash kodi noto'g'ri"));
     }
 
-    const payload = {
-      id: foundedUser._id,
-      email: foundedUser.email,
-      role: foundedUser.role,
-    };
+    if (user.verifyCodeExpires < new Date()) {
+      return next(
+        CustomErrorHandler.BadRequest("Tasdiqlash kodining muddati tugagan"),
+      );
+    }
 
-    const token = jwt.sign(payload, process.env.SECRET_KEY, {
-      expiresIn: "15d",
-    });
+    await UserSchema.updateOne(
+      { email },
+      {
+        isVerified: true,
+        verifyCode: null,
+        verifyCodeExpires: null,
+      },
+    );
 
-    await AuthSchema.findByIdAndUpdate(foundedUser._id, {
-      otp: "",
-      otpTime: 0,
-    });
-
-    res.status(200).json({
-      message: "Succes",
-      token,
-    });
+    res.status(200).json({ message: "Hisob muvaffaqiyatli tasdiqlandi" });
   } catch (error) {
-    res.status(500).json({
-      message: error.message,
-    });
+    next(error);
   }
 };
 
-const login = async (req, res) => {
+const login = async (req, res, next) => {
   try {
     const { email, password } = req.body;
 
-    const foundedUser = await AuthSchema.findOne({ email });
+    const user = await UserSchema.findOne({ email });
 
-    if (!foundedUser) {
-      throw CustomErrorHandler.UnAuthorized("User not found");
+    if (!user) {
+      return next(CustomErrorHandler.BadRequest("Email yoki parol noto'g'ri"));
     }
 
-    const decode = await bcrypt.compare(password, foundedUser.password);
-
-    if (decode) {
-      const randomCode = Array.from({ length: 6 }, () =>
-        Math.floor(Math.random() * 9),
-      ).join("");
-
-      const dateNow = Date.now() + 120000;
-
-      await sendEmail(email, randomCode);
-
-      await AuthSchema.findByIdAndUpdate(foundedUser._id, { otp: randomCode, otpTime: dateNow })
-
-      res.status(200).json({
-        message: "Please check your email"
-      })
-
-    } else {
-      throw CustomErrorHandler.UnAuthorized("Wrong password");
+    if (!user.isVerified) {
+      return next(
+        CustomErrorHandler.Forbidden("Avval emailingizni tasdiqlang"),
+      );
     }
-  } catch (error) {
-    res.status(500).json({
-      message: error.message,
+
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      return next(CustomErrorHandler.BadRequest("Email yoki parol noto'g'ri"));
+    }
+
+    const accsess = accsess_token(payload);
+    const refresh = refresh_token(payload);
+
+    res.cookie("accessToken", accsess, { httpOnly: true, maxAge: 15 * 60 * 1000 });
+    res.cookie("refreshToken", refresh, { httpOnly: true, maxAge: 7 * 24 * 60 * 60 * 1000 });
+
+    res.status(200).json({
+      message: "Muvaffaqiyatli kirildi",
+      token: accsess,
+      user: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+      },
     });
+  } catch (error) {
+    next(error);
   }
 };
 
-module.exports = {
-  register,
-  verify,
-  login,
+
+
+
+const logout = async (req, res, next) => {
+  try {
+
+    res.clearCookie("accessToken");
+    res.clearCookie("refreshToken");
+
+    res.status(200).json({
+      message: "Muvaffaqiyatli chiqildi"
+    })
+
+  } catch (error) {
+    res.status(500).json({
+      message: error.message
+    })
+  }
 };
+
+
+
+
+
+module.exports = { register, verify, login, logout };

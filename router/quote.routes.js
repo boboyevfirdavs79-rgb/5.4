@@ -1,56 +1,21 @@
 const { Router } = require("express");
 const {
-  getBookQuotes,
+  getAllQuotes,
+  getOneQuote,
+  getQuotesByBook,
   addQuote,
-  updateQuote,
   deleteQuote,
 } = require("../controller/quote.controller");
-const authMiddleware = require("../middleware/auth.middleware");
-const { body } = require("express-validator");
-const { validate } = require("../validator/auth.validator");
+const authorization = require("../middleware/authorization");
+const adminChecker = require("../middleware/admin.checker");
+const quoteValidateMiddleware = require("../middleware/quote.validate.middleware");
 
 const quoteRouter = Router();
 
-quoteRouter.get("/books/:bookId/quotes", getBookQuotes);
-
-quoteRouter.post(
-  "/books/:bookId/quotes",
-  authMiddleware,
-  [
-    body("text")
-      .trim()
-      .notEmpty()
-      .withMessage("Iqtibos matni bo'sh bo'lmasin")
-      .isLength({ min: 5, max: 500 })
-      .withMessage("Iqtibos 5-500 ta belgi oralig'ida bo'lsin"),
-    body("page")
-      .optional()
-      .isInt({ min: 1 })
-      .withMessage("Sahifa raqami musbat son bo'lsin"),
-  ],
-  validate,
-  addQuote,
-);
-
-quoteRouter.put(
-  "/quotes/:id",
-  authMiddleware,
-  [
-    body("text")
-      .trim()
-      .notEmpty()
-      .withMessage("Iqtibos matni bo'sh bo'lmasin")
-      .isLength({ min: 5, max: 500 })
-      .withMessage("Iqtibos 5-500 ta belgi oralig'ida bo'lsin"),
-    body("page")
-      .optional()
-      .isInt({ min: 1 })
-      .withMessage("Sahifa raqami musbat son bo'lsin"),
-  ],
-  validate,
-  updateQuote,
-);
-
-quoteRouter.delete("/quotes/:id", authMiddleware, deleteQuote);
+quoteRouter.get("/get_all_quotes", authorization, getAllQuotes);
+quoteRouter.get("/get_one_quote/:id", authorization, getOneQuote);
+quoteRouter.get("/get_quotes_by_book/:book_id", authorization, getQuotesByBook);
+quoteRouter.post("/add_quote", adminChecker, quoteValidateMiddleware, addQuote);
+quoteRouter.delete("/delete_quote/:id", adminChecker, deleteQuote);
 
 module.exports = quoteRouter;
