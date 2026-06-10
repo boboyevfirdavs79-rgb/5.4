@@ -1,159 +1,133 @@
-const bcrypt = require("bcryptjs");
-const UserSchema = require("../schema/user.schema");
 const CustomErrorHandler = require("../error/error");
-const sendEmail = require("../utils/sendEmail");
+const AuthorSchema = require("../schema/author.schema");
 
-const randomcode = Array.from({ length: 6 }, () =>
-  Math.floor(Math.random() * 9),
-).join("");
-
-const register = async (req, res, next) => {
+const getAllAuthors = async (req, res, next) => {
   try {
-    const { username, email, password } = req.body;
+    const authors = await AuthorSchema.find();
 
-    const existingUser = await UserSchema.findOne({
-      $or: [{ email }, { username }],
+    res.status(200).json(authors);
+  } catch (error) {
+    next(error);
+  }
+};
+
+const search = async (req, res, next) => {
+  try {
+    const { searchingvalue } = req.query;
+
+    const authors = await AuthorSchema.find({
+      full_name: { $regex: searchingvalue, $options: "i" },
     });
 
-    if (existingUser) {
-      if (existingUser.email === email) {
-        return next(
-          CustomErrorHandler.BadRequest(
-            "Bu email allaqachon ro'yxatdan o'tgan",
-          ),
-        );
-      }
-      return next(CustomErrorHandler.BadRequest("Bu username band"));
+    res.status(200).json(authors);
+  } catch (error) {
+    next(error);
+  }
+};
+
+const addAuthor = async (req, res, next) => {
+  console.log("So'rov controllerga keldi!");
+  try {
+    const { full_name, birth_year, death_year, bio, period, work, region } =
+      req.body;
+
+    if (!req.file) {
+      throw CustomErrorHandler.BadRequest("file bolishi shart!");
     }
 
-    const hashedPassword = await bcrypt.hash(password, 12);
-
-    const verifyCode = randomcode;
-    const verifyCodeExpires = new Date(Date.now() + 10 * 60 * 1000);
-
-    await UserSchema.create({
-      username,
-      email,
-      password: hashedPassword,
-      verifyCode,
-      verifyCodeExpires,
+    await AuthorSchema.create({
+      full_name,
+      birth_year,
+      death_year,
+      bio,
+      period,
+      work,
+      region,
+      picture: "http://localhost:4001/uploads/" + req.file.filename,
     });
 
-    await sendEmail(email, verifyCode);
-
     res.status(201).json({
-      message: `${email} manziliga tasdiqlash kodi yuborildi`,
+      message: "Added new author",
     });
   } catch (error) {
     next(error);
   }
 };
 
-const verify = async (req, res, next) => {
+const getOneAuthor = async (req, res, next) => {
   try {
-    const { email, code } = req.body;
+    const { id } = req.params;
 
-    const user = await UserSchema.findOne({ email });
+    const foundedAuthor = await AuthorSchema.findById(id);
 
-    if (!user) {
-      return next(CustomErrorHandler.NotFound("Foydalanuvchi topilmadi"));
+    if (!foundedAuthor) {
+      throw CustomErrorHandler.NotFound("Author not found");
     }
 
-    if (user.isVerified) {
-      return next(
-        CustomErrorHandler.BadRequest("Hisob allaqachon tasdiqlangan"),
-      );
+    res.status(200).json(foundedAuthor);
+  } catch (error) {
+    next(error);
+  }
+};
+
+const updateAuthor = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { full_name, birth_year, death_year, bio, period, work, region } =
+      req.body;
+
+    const foundedAuthor = await AuthorSchema.findById(id);
+
+    if (!foundedAuthor) {
+      throw CustomErrorHandler.NotFound("Author not found");
     }
 
-    if (user.verifyCode !== code) {
-      return next(CustomErrorHandler.BadRequest("Tasdiqlash kodi noto'g'ri"));
-    }
-
-    if (user.verifyCodeExpires < new Date()) {
-      return next(
-        CustomErrorHandler.BadRequest("Tasdiqlash kodining muddati tugagan"),
-      );
-    }
-
-    await UserSchema.updateOne(
-      { email },
+    await AuthorSchema.updateOne(
+      { _id: id },
       {
-        isVerified: true,
-        verifyCode: null,
-        verifyCodeExpires: null,
+        full_name,
+        birth_year,
+        death_year,
+        bio,
+        period,
+        work,
+        region,
       },
     );
 
-    res.status(200).json({ message: "Hisob muvaffaqiyatli tasdiqlandi" });
-  } catch (error) {
-    next(error);
-  }
-};
-
-const login = async (req, res, next) => {
-  try {
-    const { email, password } = req.body;
-
-    const user = await UserSchema.findOne({ email });
-
-    if (!user) {
-      return next(CustomErrorHandler.BadRequest("Email yoki parol noto'g'ri"));
-    }
-
-    if (!user.isVerified) {
-      return next(
-        CustomErrorHandler.Forbidden("Avval emailingizni tasdiqlang"),
-      );
-    }
-
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
-      return next(CustomErrorHandler.BadRequest("Email yoki parol noto'g'ri"));
-    }
-
-    const accsess = accsess_token(payload);
-    const refresh = refresh_token(payload);
-
-    res.cookie("accessToken", accsess, { httpOnly: true, maxAge: 15 * 60 * 1000 });
-    res.cookie("refreshToken", refresh, { httpOnly: true, maxAge: 7 * 24 * 60 * 60 * 1000 });
-
     res.status(200).json({
-      message: "Muvaffaqiyatli kirildi",
-      token: accsess,
-      user: {
-        id: user._id,
-        username: user.username,
-        email: user.email,
-        role: user.role,
-      },
+      message: "Updated author",
     });
   } catch (error) {
     next(error);
   }
 };
 
-
-
-
-const logout = async (req, res, next) => {
+const deleteAuthor = async (req, res, next) => {
   try {
+    const { id } = req.params;
 
-    res.clearCookie("accessToken");
-    res.clearCookie("refreshToken");
+    const foundedAuthor = await AuthorSchema.findById(id);
+
+    if (!foundedAuthor) {
+      throw CustomErrorHandler.NotFound("Author not found");
+    }
+
+    await AuthorSchema.findByIdAndDelete({ _id: id });
 
     res.status(200).json({
-      message: "Muvaffaqiyatli chiqildi"
-    })
-
+      message: "Deleted author",
+    });
   } catch (error) {
-    res.status(500).json({
-      message: error.message
-    })
+    next(error);
   }
 };
 
-
-
-
-
-module.exports = { register, verify, login, logout };
+module.exports = {
+  getAllAuthors,
+  getOneAuthor,
+  addAuthor,
+  updateAuthor,
+  deleteAuthor,
+  search,
+};
