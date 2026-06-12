@@ -1,133 +1,229 @@
 const CustomErrorHandler = require("../error/error");
-const AuthorSchema = require("../schema/author.schema");
+const AuthSchema = require("../schema/auth.schema");
+const bcrypt = require("bcryptjs");
+const sendEmail = require("../utils/email-sender");
+const jwt = require("jsonwebtoken");
+const { access_token, refresh_token } = require("../validator/token.generator");
 
-const getAllAuthors = async (req, res, next) => {
+const register = async (req, res) => {
   try {
-    const authors = await AuthorSchema.find();
+    const { username, email, password } = req.body;
 
-    res.status(200).json(authors);
-  } catch (error) {
-    next(error);
-  }
-};
+    const foundedUser = await AuthSchema.findOne({ email });
 
-const search = async (req, res, next) => {
-  try {
-    const { searchingvalue } = req.query;
-
-    const authors = await AuthorSchema.find({
-      full_name: { $regex: searchingvalue, $options: "i" },
-    });
-
-    res.status(200).json(authors);
-  } catch (error) {
-    next(error);
-  }
-};
-
-const addAuthor = async (req, res, next) => {
-  console.log("So'rov controllerga keldi!");
-  try {
-    const { full_name, birth_year, death_year, bio, period, work, region } =
-      req.body;
-
-    if (!req.file) {
-      throw CustomErrorHandler.BadRequest("file bolishi shart!");
+    if (foundedUser) {
+      throw CustomErrorHandler.UnAuthorized("User already exists");
     }
 
-    await AuthorSchema.create({
-      full_name,
-      birth_year,
-      death_year,
-      bio,
-      period,
-      work,
-      region,
-      picture: "http://localhost:4001/uploads/" + req.file.filename,
+    const randomCode = Array.from({ length: 6 }, () =>
+      Math.floor(Math.random() * 9),
+    ).join("");
+
+    const dateNow = Date.now() + 120000;
+
+    const hashPassword = await bcrypt.hash(password, 12);
+
+    await sendEmail(email, randomCode);
+
+    await AuthSchema.create({
+      username,
+      email,
+      password: hashPassword,
+      otp: randomCode,
+      otpTime: dateNow,
     });
 
     res.status(201).json({
-      message: "Added new author",
+      message: "Registered",
     });
   } catch (error) {
-    next(error);
+    res.status(500).json({
+      message: error.message || "User already exists",
+    });
   }
 };
 
-const getOneAuthor = async (req, res, next) => {
+const verify = async (req, res) => {
   try {
-    const { id } = req.params;
+    const { email, code } = req.body;
 
-    const foundedAuthor = await AuthorSchema.findById(id);
+    const foundedUser = await AuthSchema.findOne({ email });
 
-    if (!foundedAuthor) {
-      throw CustomErrorHandler.NotFound("Author not found");
+    if (!foundedUser) {
+      throw CustomErrorHandler.UnAuthorized("User not found");
     }
 
-    res.status(200).json(foundedAuthor);
+    if (foundedUser.otpTime < Date.now()) {
+      throw CustomErrorHandler.UnAuthorized("code expired");
+    }
+
+    if (foundedUser.otp !== code) {
+      throw CustomErrorHandler.UnAuthorized("wrong code");
+    }
+
+    const payload = {
+      id: foundedUser._id,
+      email: foundedUser.email,
+      role: foundedUser.role,
+    };
+
+    const access = access_token(payload);
+    const refresh = refresh_token(payload);
+
+    res.cookie("accessToken", access, {
+      httpOnly: true,
+      maxAge: 60 * 1000 * 15,
+    });
+    res.cookie("refreshToken", refresh, {
+      httpOnly: true,
+      maxAge: 60 * 1000 * 60 * 24 * 7,
+    });
+
+    await AuthSchema.findByIdAndUpdate(foundedUser._id, {
+      otp: "",
+      otpTime: 0,
+    });
+
+    res.status(200).json({
+      message: "Succes",
+      token: access,
+    });
   } catch (error) {
-    next(error);
+    res.status(500).json({
+      message: error.message,
+    });
   }
 };
 
-const updateAuthor = async (req, res, next) => {
+const login = async (req, res) => {
   try {
-    const { id } = req.params;
-    const { full_name, birth_year, death_year, bio, period, work, region } =
-      req.body;
+    const { email, password } = req.body;
 
-    const foundedAuthor = await AuthorSchema.findById(id);
+    const foundedUser = await AuthSchema.findOne({ email });
 
-    if (!foundedAuthor) {
-      throw CustomErrorHandler.NotFound("Author not found");
+    if (!foundedUser) {
+      throw CustomErrorHandler.UnAuthorized("User not found");
     }
 
-    await AuthorSchema.updateOne(
-      { _id: id },
-      {
-        full_name,
-        birth_year,
-        death_year,
-        bio,
-        period,
-        work,
-        region,
-      },
+    const decode = await bcrypt.compare(password, foundedUser.password);
+
+    if (decode) {
+      const randomCode = Array.from({ length: 6 }, () =>
+        Math.floor(Math.random() * 9),
+      ).join("");
+
+      const dateNow = Date.now() + 120000;
+
+      await sendEmail(email, randomCode);
+
+      await AuthSchema.findByIdAndUpdate(foundedUser._id, {
+        otp: randomCode,
+        otpTime: dateNow,
+      });
+
+      res.status(200).json({
+        message: "Please check your email",
+      });
+    } else {
+      throw CustomErrorHandler.UnAuthorized("Wrong password");
+    }
+  } catch (error) {
+    res.status(500).json({
+      message: error.message,
+    });
+  }
+};
+
+const logout = async (req, res) => {
+  try {
+    res.clearCookie("accessToken");
+    res.clearCookie("refreshToken");
+
+    res.status(200).json({
+      message: "ok",
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: error.message,
+    });
+  }
+};
+
+const getProfile = async (req, res) => {
+  try {
+    const foundedUser = await AuthSchema.findOne({ _id: req.user.id }).select(
+      "-password",
     );
 
-    res.status(200).json({
-      message: "Updated author",
-    });
+    res.status(200).json(foundedUser);
   } catch (error) {
-    next(error);
+    res.status(500).json({
+      message: error.message,
+    });
   }
 };
 
-const deleteAuthor = async (req, res, next) => {
+const forgotPassword = async (req, res) => {
   try {
-    const { id } = req.params;
+    const { email } = req.body;
 
-    const foundedAuthor = await AuthorSchema.findById(id);
+    const foundedUser = await AuthSchema.findOne({ email });
 
-    if (!foundedAuthor) {
-      throw CustomErrorHandler.NotFound("Author not found");
+    if (!foundedUser) {
+      throw CustomErrorHandler.UnAuthorized("User not found");
     }
 
-    await AuthorSchema.findByIdAndDelete({ _id: id });
+    const randomCode = Array.from({ length: 6 }, () =>
+      Math.floor(Math.random() * 9),
+    ).join("");
+
+    const dateNow = Date.now() + 120000;
+
+    await sendEmail(email, randomCode);
+
+    await AuthSchema.findByIdAndUpdate(foundedUser._id, {
+      otp: randomCode,
+      otpTime: dateNow,
+    });
 
     res.status(200).json({
-      message: "Deleted author",
+      message: "Please check your email",
     });
   } catch (error) {
-    next(error);
+    res.status(500).json({
+      message: error.message,
+    });
+  }
+};
+
+const changePassword = async (req, res) => {
+  try {
+    const { new_password } = req.body;
+
+    const foundedUser = await AuthSchema.findOne({ email: req.user.email });
+
+    const hashPassword = await bcrypt.hash(new_password, 12);
+
+    await AuthSchema.findByIdAndUpdate(foundedUser._id, {
+      password: hashPassword,
+    });
+
+    res.status(200).json({
+      message: "Success",
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: error.message,
+    });
   }
 };
 
 module.exports = {
-  getAllAuthors,
-  getOneAuthor,
-  addAuthor,
-  updateAuthor,
-  deleteAuthor,
-  search,
+  register,
+  verify,
+  login,
+  logout,
+  getProfile,
+  forgotPassword,
+  changePassword,
 };

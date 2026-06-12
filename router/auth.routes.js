@@ -1,19 +1,18 @@
-const { Router } = require("express");
-const { register, verify, login, logout } = require("../controller/auth.controller");
-const {
-  registerValidator,
-  loginValidator,
-  verifyValidator,
-  validate,
-} = require("../validator/auth.validator");
-const refreshToken = require("../middleware/refresh-token");
+const { Router } = require("express")
+const { register, verify, login, logout, getProfile, forgotPassword, changePassword } = require("../controller/auth.controller")
+const authValidateMiddleware = require("../middleware/auth.validate.middleware")
+const refreshToken = require("../middleware/refresh-token")
+const authorization = require("../middleware/authorization")
 
-const authRouter = Router();
+const authRouter = Router()
 
-authRouter.post("/auth/register", registerValidator, validate, register);
-authRouter.post("/auth/verify", verifyValidator, validate, verify);
-authRouter.post("/auth/login", loginValidator, validate, login);
+authRouter.post("/register", authValidateMiddleware, register)
+authRouter.post("/verify", verify)
+authRouter.post("/login", login)
 authRouter.get("/refresh", refreshToken)
-authRouter.options("/logout", logout)
+authRouter.get("/logout", logout)
+authRouter.post("/forgot_password", forgotPassword)
+authRouter.post("/change_password", authorization, changePassword)
+authRouter.get("/profile", authorization, getProfile)
 
-module.exports = authRouter;
+module.exports = authRouter
