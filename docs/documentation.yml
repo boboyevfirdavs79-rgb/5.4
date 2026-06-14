@@ -1,0 +1,504 @@
+openapi: 3.0.0
+
+info:
+  title: Devbook API
+  version: 1.0.0
+  description: API documentation for Devbook a platform for developers to share their projects and connect with other developers
+
+servers:
+  - url: http://localhost:4001
+    description: Production server
+
+components:
+  securitySchemes:
+    cookieAuth:
+      type: ApiKey
+      in: cookie
+      name: refreshToken
+
+paths:
+  /register:
+    post:
+      tags:
+         - Authentication
+      summary: Register a new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+                  default: "John Doe"
+                email:
+                  type: string
+                  default: johndoe1@gmail.com
+                password:
+                  type: string
+                  default: password123
+              required:
+                - name
+                - email
+                - password
+      responses:
+        '201':
+          description: User registered successfully
+        '400':
+          description: Bad request
+        '401':
+          description: User already exists
+
+
+  /login:
+    post:
+      tags:
+         - Authentication
+      summary: Login a user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  default: "johndoe1@gmail.com"
+                password:
+                  type: string
+                  default: password123
+              required:
+                - email
+                - password  
+      responses:
+        '200':
+          description: Please check your email for the code
+        '400':
+          description: Bad request
+        '401':
+          description: Wrong password
+        '404':
+          description: User not found
+
+  /verify:
+    post:
+      tags:
+         - Authentication
+      summary: Verify a user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  default: "johndoe1@gmail.com"
+                code:
+                  type: string
+                  default: 123456   
+              required:
+                - email 
+      responses:
+        '200':
+          description: Email verified successfully
+        '400':
+          description: Bad request
+        '401':
+          description: Code expired
+        401:
+          description: Wrong code  
+        '404':
+          description: User not found
+
+  /logout:
+    get:
+      tags:
+         - Authentication
+      summary: Logout a user
+      description: Clears authentication cookies and logs out the user
+      responses:
+        '200':
+          description: User logged out successfully
+          headers:
+            Set-Cookie:
+              description: Authentication cookies cleared
+              schema:
+                type: string
+                example: refresToken=; HttpOnly; Path=/; Max-Age=0
+        '400':
+          description: Bad request
+
+  /refresh:
+    get:
+      tags:
+         - Authentication
+      summary: Refresh access token
+      description: Generates a new access token using the refresh token stored in cookies
+      responses:
+        '200':
+          description: New access token generated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accessToken:
+                    type: string
+                    example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY0YjQ3YjE2ZDIyYzQ4MDAwMDAwMDAwMCIsImlhdCI6MTY4NzA5Njk0MywiZXhwIjoxNjg3MDk3NTQzfQ.7v
+                    refreshToken:
+                      type: string
+                      example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY0YjQ3YjE2ZDIyYzQ4MDAwMDAwMDAwMCIsImlhdCI6MTY4NzA5Njk0MywiZXhwIjoxNjg3MDk3NTQzfQ.7v
+        '401':
+          description: UnAuthorized - Invalid refresh token'     
+
+  /profile:
+    get:
+      tags:
+         - Authentication
+      summary: Get user profile
+      description: Retrieves the profile information of the authenticated user
+      responses:
+        '200':
+          description: User profile retrieved successfully
+
+  /get_all_authors:
+    get:
+      tags:
+         - Author
+      summary: Get all authors
+      description: Retrieves a list of all authors registered on the platform
+      responses:
+        '200':
+          description: List of authors retrieved successfully 
+
+  /get_one_author/{id}:
+    get:
+      tags:
+         - Author
+      summary: Get one author
+      description: Retrieves the profile information of a specific author by their ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: The ID of the author to retrieve
+      responses:
+        '200':
+          description: Author profile retrieved successfully 
+        '404':
+          description: Author not found
+
+  /add_author:
+    post:
+      tags:
+         - Author
+      summary: Add a new author
+      description: Creates a new author profile on the platform
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                full_name:
+                  type: string
+                  default: "John Doe"
+                birth_year:
+                  type: string
+                  default: "1990"
+                death_year:
+                  type: string
+                  default: "2020"
+                bio:
+                  type: string
+                  default: "John Doe was a renowned author known for his captivating storytelling and unique writing style. Born in 1990, he began his writing career at a young age and quickly gained recognition for his talent. Throughout his life, John published numerous best-selling novels that captivated readers around the world. His works often explored themes of love, loss, and the human condition, earning him critical acclaim and a dedicated fan base. John Doe's legacy continues to inspire aspiring writers and readers alike, making him one of the most influential authors of his generation."
+                period:
+                  type: string
+                  default: "Temuriylar davri"
+                work:
+                  type: string
+                  default: "The Great Novel"
+                region:
+                  type: string
+                  default: "North America"
+                picture:
+                  type: string
+                  default: "https://example.com/johndoe.jpg"
+              required:
+                - full_name
+                - birth_year
+                - death_year
+                - bio
+                - period
+                - work
+                - region
+      responses:
+        '201':
+          description: Added new Author 
+        '400':
+          description: Bad request
+
+  /update_author/{id}:
+    put:
+      tags:
+         - Author
+      summary: Update an author
+      description: Updates the profile information of a specific author by their ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: The ID of the author to update
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                full_name:
+                  type: string
+                  default: "John Doe"
+                birth_year:
+                  type: string
+                  default: "1990"
+                death_year:
+                  type: string
+                  default: "2020"
+                bio:
+                  type: string
+                  default: "John Doe was a renowned author known for his captivating storytelling and unique writing style. Born in 1990, he began his writing career at a young age and quickly gained recognition for his talent. Throughout his life, John published numerous best-selling novels that captivated readers around the world. His works often explored themes of love, loss, and the human condition, earning him critical acclaim and a dedicated fan base. John Doe's legacy continues to inspire aspiring writers and readers alike, making him one of the most influential authors of his generation."
+                period:
+                  type: string
+                  default: "Temuriylar davri"
+                work:
+                  type: string
+                  default: "The Great Novel"
+                region:
+                  type: string
+                  default: "North America"
+                picture:
+                  type: string
+                  default: "https://example.com/johndoe.jpg"
+              required:
+                - full_name
+                - birth_year
+                - death_year
+                - bio
+                - period
+                - work
+                - region 
+      responses:
+        '200':
+          description: Updated Author  
+        '400':
+          description: Bad request 
+        '404':
+          description: Author not found
+
+  /delete_author/{id}:
+    delete:
+      tags:
+         - Author
+      summary: Delete an author
+      description: Deletes a specific author by their ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: The ID of the author to delete
+      responses:
+        '200':
+          description: Deleted Author  
+        '400':
+          description: Bad request 
+        '404':
+          description: Author not found
+
+  /get_all_books:
+    get:
+      tags:
+         - Book
+      summary: Get all books
+      description: Retrieves a list of all books available on the platform
+      responses:
+        '200':
+          description: List of books retrieved successfully
+
+  /get_one_book/{id}:
+    get:
+      tags:
+         - Book
+      summary: Get one book
+      description: Retrieves the details of a specific book by its ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: The ID of the book to retrieve
+      responses:
+        '200':
+          description: Book details retrieved successfully 
+        '404':
+          description: Book not found
+
+  /add_book:
+    post:
+      tags:
+         - Book
+      summary: Add a new book
+      description: Creates a new book entry on the platform
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                  default: "The Great Novel"
+                author_id:
+                  type: string
+                  default: "64b47b16d22c480000000000"
+                published_year:
+                  type: string
+                  default: "2020"
+                pages:
+                  type: string
+                  default: "350"  
+                genre:
+                  type: string
+                  default: "Fiction"
+                details:
+                  type: string
+                  default: "The Great Novel is a captivating story that explores the complexities of human relationships and the power of love. Set in a small town, the novel follows the lives of several characters as they navigate through their personal struggles and triumphs. With its rich storytelling and well-developed characters, The Great Novel has become a beloved classic that continues to resonate with readers of all ages."
+                publisher:
+                  type: string
+                  default: "Penguin Books"
+                period: 
+                  type: string
+                  default: "Temuriylar davri" 
+                quotes:
+                  type: string
+                  default: "The Great Novel is a masterpiece that will leave you breathless."
+              required:
+                - title
+                - author_id
+                - publication_year
+                - genre
+                - details
+                - publisher
+                - period
+                - quotes
+                - pages
+                - 
+      responses:
+        '201':
+          description: Added new Book 
+        '400':
+          description: Bad request   
+
+  /update_book/{id}:
+    put:
+      tags:
+         - Book
+      summary: Update a book
+      description: Updates the details of a specific book by its ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: The ID of the book to update
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                  default: "The Great Novel"
+                author_id:
+                  type: string
+                  default: "64b47b16d22c480000000000"
+                published_year:
+                  type: string
+                  default: "2020"
+                pages:
+                  type: string
+                  default: "350"  
+                genre:
+                  type: string
+                  default: "Fiction"
+                details:
+                  type: string
+                  default: "The Great Novel is a captivating story that explores the complexities of human relationships and the power of love. Set in a small town, the novel follows the lives of several characters as they navigate through their personal struggles and triumphs. With its rich storytelling and well-developed characters, The Great Novel has become a beloved classic that continues to resonate with readers of all ages."
+                publisher:
+                  type: string
+                  default: "Penguin Books"
+                period: 
+                  type: string
+                  default: "Temuriylar davri" 
+                quotes:
+                  type: string
+                  default: "The Great Novel is a masterpiece that will leave you breathless."
+              required:
+                - title
+                - author_id
+                - publication_year
+                - genre
+                - details
+                - publisher
+                - period
+                - quotes 
+      responses:
+        '200':
+          description: Updated Book  
+        '400':
+          description: Bad request 
+        '404':
+          description: Book not found
+
+  /delete_book/{id}:
+    delete:
+      tags:
+         - Book
+      summary: Delete a book
+      description: Deletes a specific book by its ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: The ID of the book to delete
+      responses:
+        '200':
+          description: Deleted Book  
+        '400':
+          description: Bad request 
+        '404':
+          description: Book not found                                     
+
+
+                                      
+                              
+                    
+                
